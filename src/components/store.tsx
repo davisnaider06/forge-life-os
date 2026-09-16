@@ -136,41 +136,60 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     const local = isDemo ? { ...empty(), state: demoState() } : read(GUEST) || empty();
     ref.current = local;
     setEnvelope(local);
-    setReady(true);
-    if (isDemo) return;
+    if (isDemo) {
+      setReady(true);
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    if (params.get('auth') === 'error') {
+      notify('Não foi possível confirmar seu login. Peça um novo link.');
+      params.delete('auth');
+      const rest = params.toString();
+      history.replaceState(null, '', location.pathname + (rest ? '?' + rest : ''));
+    }
     fetch('/api/session')
       .then(r => r.json())
       .then(async (c: Capabilities) => {
         if (!active) return;
         caps.current = c;
         setCapabilities(c);
-        if (!c.user || !c.cloud) return;
+        if (!c.user || !c.cloud) {
+          setReady(true);
+          return;
+        }
         key.current = `forge.app.user.${c.user.id}.v1`;
         const cached = read(key.current);
         if (cached) persist(cached);
-        const response = await fetch('/api/state');
-        if (!response.ok) throw Error('Não foi possível carregar a conta.');
-        const remote = await response.json();
-        if (!active) return;
-        if (remote.state) {
-          const pending = cached?.pending || [];
-          let state: AppState = remote.state;
-          for (const cmd of pending) state = applyCommand(state, cmd, new Date(cmd.at));
-          persist({ state, pending, version: remote.version, history: cached?.history || [] });
-        } else {
-          const guest = read(GUEST) || empty();
-          persist(cached || { ...guest, pending: guest.history });
+        try {
+          const response = await fetch('/api/state');
+          if (!response.ok) throw Error('Não foi possível carregar a conta.');
+          const remote = await response.json();
+          if (!active) return;
+          if (remote.state) {
+            const pending = cached?.pending || [];
+            let state: AppState = remote.state;
+            for (const cmd of pending) state = applyCommand(state, cmd, new Date(cmd.at));
+            persist({ state, pending, version: remote.version, history: cached?.history || [] });
+          } else {
+            const guest = read(GUEST) || empty();
+            persist(cached || { ...guest, pending: guest.history });
+          }
+          await flush();
+          setSyncStatus(ref.current.pending.length ? 'Alterações pendentes' : 'Sincronizado');
+        } finally {
+          if (active) setReady(true);
         }
-        await flush();
-        setSyncStatus(ref.current.pending.length ? 'Alterações pendentes' : 'Sincronizado');
       })
       .catch(() => {
-        if (active) setSyncStatus('Offline · salvo no aparelho');
+        if (active) {
+          setSyncStatus('Offline · salvo no aparelho');
+          setReady(true);
+        }
       });
     return () => {
       active = false;
     };
-  }, [persist, flush]);
+  }, [persist, flush, notify]);
   useEffect(() => {
     const online = () => {
       void flush();

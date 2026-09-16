@@ -42,13 +42,15 @@ export async function pluggy(path: string, init: RequestInit = {}) {
   return res.status === 204 ? null : res.json();
 }
 export async function connectToken(userId: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL,
+    oauthRedirectUri = appUrl?.startsWith('https://') ? appUrl : undefined;
   return pluggy('/connect_token', {
     method: 'POST',
     body: JSON.stringify({
       options: {
         clientUserId: userId,
         avoidDuplicates: true,
-        oauthRedirectUri: process.env.NEXT_PUBLIC_APP_URL,
+        ...(oauthRedirectUri ? { oauthRedirectUri } : {}),
       },
     }),
   });
