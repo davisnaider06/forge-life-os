@@ -23,10 +23,11 @@ Leia AGENTS.md e README.md antes de alterar o projeto. O usuário exige preserva
 - Dashboard: https://supabase.com/dashboard/project/fggzqicdvxmjakvbfxwd
 - Migration 001 aplicada em 16/09/2026 pelo SQL Editor, em transação. Quatro tabelas verificadas com RLS ativa, sem SELECT anônimo nem INSERT direto por authenticated. Não reaplique a migration neste banco: as políticas já existem.
 - Supabase Auth: Site URL http://localhost:4180 e redirect http://localhost:4180/auth/callback configurados. Configure a URL pública quando houver deploy.
-- .env.local criado e ignorado pelo Git. Ainda faltam as chaves locais e a validação real do login e da sincronização.
+- .env.local preenchido localmente pelo usuário e ignorado pelo Git. Conexão real do servidor às quatro tabelas validada; chamadas anônimas negadas com código 42501. Login por email e sincronização de dados reais ainda aguardam validação do usuário.
 - Pluggy e push têm implementação, mas não foram ativados ou validados de ponta a ponta.
 - Bancos desejados: conta e cartão BB, conta Mercado Pago e VR. A cobertura de VR não está confirmada.
 - Validar navegação offline, persistência de conquistas após interrupção da sequência e preservação da classificação de cartão ao remover conexões bancárias.
 
 Os dados locais deste navegador não são enviados pelo GitHub. Use Exportar meus dados no app para fazer uma cópia antes de trocar de computador; a sincronização na nuvem ainda depende da configuração acima.
+
 

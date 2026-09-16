@@ -16,7 +16,8 @@ const anon = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
 let failed = false;
 for (const table of ['forge_documents', 'forge_bank_items', 'forge_push_subscriptions', 'forge_notification_receipts']) {
   const server = await admin.from(table).select('*', { head: true });
-  const visitor = await anon.from(table).select('*', { head: true });
+  // GET with zero rows preserves the provider error code; HEAD omits its body.
+  const visitor = await anon.from(table).select('user_id').limit(0);
   const serverOk = !server.error;
   const visitorBlocked = visitor.error?.code === '42501';
   console.log(`${table}: servidor ${serverOk ? 'OK' : 'FALHOU'}; bloqueio anônimo ${visitorBlocked ? 'OK' : 'NÃO CONFIRMADO'}`);
