@@ -1,5 +1,61 @@
-import{NextResponse}from'next/server';
-import{z}from'zod';
-import{secretMatches,fail,jsonBody,HttpError,mutateDocument,admin}from'@/lib/server';
-import{pluggy,syncItem}from'@/lib/pluggy';
-export async function POST(req:Request){try{if(!secretMatches(req.headers.get('authorization'),'Bearer '+(process.env.PLUGGY_WEBHOOK_SECRET||''))||!process.env.PLUGGY_WEBHOOK_SECRET)throw new HttpError(401,'Não autorizado.');const body=z.object({event:z.string(),itemId:z.string().uuid().optional(),transactionIds:z.array(z.string()).max(1000).optional()}).passthrough().parse(await jsonBody(req,64000));if(!body.itemId)return NextResponse.json({received:true});if(body.event==='item/deleted'){const db=admin(),{data}=await db.from('forge_bank_items').select('user_id').eq('item_id',body.itemId).maybeSingle();if(data){await mutateDocument(data.user_id,s=>{const next=structuredClone(s);next.accounts=next.accounts.filter(a=>a.itemId!==body.itemId);return next;});await db.from('forge_bank_items').delete().eq('item_id',body.itemId);}return NextResponse.json({received:true});}const item=z.object({clientUserId:z.string().uuid()}).parse(await pluggy('/items/'+body.itemId));if(body.event==='transactions/deleted'){const ids=new Set(body.transactionIds||[]);await mutateDocument(item.clientUserId,s=>({...s,transactions:s.transactions.filter(t=>!t.providerId||!ids.has(t.providerId))}));}else if(['item/created','item/updated','transactions/created','transactions/updated'].includes(body.event)){await syncItem(item.clientUserId,body.itemId);}return NextResponse.json({received:true});}catch(e){return fail(e);}}
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { secretMatches, fail, jsonBody, HttpError, mutateDocument, admin } from '@/lib/server';
+import { pluggy, syncItem } from '@/lib/pluggy';
+export async function POST(req: Request) {
+  try {
+    if (
+      !secretMatches(
+        req.headers.get('authorization'),
+        'Bearer ' + (process.env.PLUGGY_WEBHOOK_SECRET || ''),
+      ) ||
+      !process.env.PLUGGY_WEBHOOK_SECRET
+    )
+      throw new HttpError(401, 'Não autorizado.');
+    const body = z
+      .object({
+        event: z.string(),
+        itemId: z.string().uuid().optional(),
+        transactionIds: z.array(z.string()).max(1000).optional(),
+      })
+      .passthrough()
+      .parse(await jsonBody(req, 64000));
+    if (!body.itemId) return NextResponse.json({ received: true });
+    if (body.event === 'item/deleted') {
+      const db = admin(),
+        { data } = await db
+          .from('forge_bank_items')
+          .select('user_id')
+          .eq('item_id', body.itemId)
+          .maybeSingle();
+      if (data) {
+        await mutateDocument(data.user_id, s => {
+          const next = structuredClone(s);
+          next.accounts = next.accounts.filter(a => a.itemId !== body.itemId);
+          return next;
+        });
+        await db.from('forge_bank_items').delete().eq('item_id', body.itemId);
+      }
+      return NextResponse.json({ received: true });
+    }
+    const item = z
+      .object({ clientUserId: z.string().uuid() })
+      .parse(await pluggy('/items/' + body.itemId));
+    if (body.event === 'transactions/deleted') {
+      const ids = new Set(body.transactionIds || []);
+      await mutateDocument(item.clientUserId, s => ({
+        ...s,
+        transactions: s.transactions.filter(t => !t.providerId || !ids.has(t.providerId)),
+      }));
+    } else if (
+      ['item/created', 'item/updated', 'transactions/created', 'transactions/updated'].includes(
+        body.event,
+      )
+    ) {
+      await syncItem(item.clientUserId, body.itemId);
+    }
+    return NextResponse.json({ received: true });
+  } catch (e) {
+    return fail(e);
+  }
+}

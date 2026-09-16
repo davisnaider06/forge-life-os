@@ -1,27 +1,261 @@
 'use client';
-import {createContext,useCallback,useContext,useEffect,useRef,useState, type ReactNode} from 'react';
-import {applyCommand,initialState,demoState,makeCommand,type AppState,type Command} from '@/lib/domain';
-type Envelope={state:AppState;pending:Command[];history:Command[];version:number};
-type Capabilities={cloud:boolean;banking:boolean;push:boolean;user:{id:string;email:string}|null};
-type Context={state:AppState;ready:boolean;demo:boolean;capabilities:Capabilities;syncStatus:string;message:string;notify:(m:string)=>void;dispatch:(type:Command['type'],payload:unknown)=>void;retry:()=>void;exportData:()=>void};
-const Store=createContext<Context|null>(null),GUEST='forge.app.guest.v1';
-function read(key:string):Envelope|null{try{const raw=localStorage.getItem(key);if(!raw)return null;const e=JSON.parse(raw);if(e.state?.schema!==1||!Array.isArray(e.state.habits)||!Array.isArray(e.history)||!Array.isArray(e.pending)||!e.state.profile)return null;return e;}catch{return null;}}
-const empty=():Envelope=>({state:initialState(),pending:[],history:[],version:0});
-export function ForgeProvider({children}:{children:ReactNode}){
- const [envelope,setEnvelope]=useState<Envelope>(empty),ref=useRef(envelope),key=useRef(GUEST),busy=useRef(false);
- const [ready,setReady]=useState(false),[demo,setDemo]=useState(false),[capabilities,setCapabilities]=useState<Capabilities>({cloud:false,banking:false,push:false,user:null}),caps=useRef(capabilities),[syncStatus,setSyncStatus]=useState('Neste aparelho'),[message,setMessage]=useState('');
- const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
- const notify=useCallback((m:string)=>{setMessage(m);if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>setMessage(''),4000);},[]);
- const persist=useCallback((next:Envelope)=>{ref.current=next;setEnvelope(next);try{localStorage.setItem(key.current,JSON.stringify(next));}catch{setSyncStatus('Falha ao salvar');notify('O armazenamento está cheio ou indisponível. Exporte seus dados.');}},[notify]);
- const flush=useCallback(async()=>{if(busy.current||!caps.current.user||!caps.current.cloud||key.current.includes('.demo.')||!ref.current.pending.length)return;if(!navigator.onLine){setSyncStatus('Offline · salvo no aparelho');return;}busy.current=true;setSyncStatus('Sincronizando…');const batch=ref.current.pending.slice(0,200);try{const res=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:ref.current.version,commands:batch})});const body=await res.json();if(!res.ok)throw Error(body.error||'Não foi possível sincronizar.');const ack=new Set(batch.map(c=>c.id)),rest=ref.current.pending.filter(c=>!ack.has(c.id));let state:AppState=body.state;for(const cmd of rest)state=applyCommand(state,cmd,new Date(cmd.at));persist({...ref.current,state,pending:rest,version:body.version});setSyncStatus(rest.length?'Alterações pendentes':'Sincronizado');}catch(e){setSyncStatus('Sincronização pendente');notify(e instanceof Error?e.message:'Seus dados continuam neste aparelho.');}finally{busy.current=false;}},[notify,persist]);
- useEffect(()=>{let active=true;const isDemo=new URLSearchParams(location.search).get('demo')==='1';setDemo(isDemo);key.current=isDemo?'forge.app.demo.v1':GUEST;const local=isDemo?{...empty(),state:demoState()}:read(GUEST)||empty();ref.current=local;setEnvelope(local);setReady(true);if(isDemo)return;
- fetch('/api/session').then(r=>r.json()).then(async(c:Capabilities)=>{if(!active)return;caps.current=c;setCapabilities(c);if(!c.user||!c.cloud)return;key.current=`forge.app.user.${c.user.id}.v1`;const cached=read(key.current);if(cached)persist(cached);const response=await fetch('/api/state');if(!response.ok)throw Error('Não foi possível carregar a conta.');const remote=await response.json();if(!active)return;if(remote.state){const pending=cached?.pending||[];let state:AppState=remote.state;for(const cmd of pending)state=applyCommand(state,cmd,new Date(cmd.at));persist({state,pending,version:remote.version,history:cached?.history||[]});}else{const guest=read(GUEST)||empty();persist(cached||{...guest,pending:guest.history});}await flush();setSyncStatus(ref.current.pending.length?'Alterações pendentes':'Sincronizado');}).catch(()=>{if(active)setSyncStatus('Offline · salvo no aparelho');});
- return()=>{active=false;};
- },[persist,flush]);
- useEffect(()=>{const online=()=>{void flush();};const storage=(e:StorageEvent)=>{if(e.key===key.current&&!busy.current){const next=read(key.current);if(next){ref.current=next;setEnvelope(next);}}};addEventListener('online',online);addEventListener('storage',storage);const poll=setInterval(()=>{void flush();},12000);return()=>{removeEventListener('online',online);removeEventListener('storage',storage);clearInterval(poll);};},[flush]);
- const dispatch=useCallback((type:Command['type'],payload:unknown)=>{const cmd=makeCommand(type,payload);const latest=read(key.current)||ref.current;try{const state=applyCommand(latest.state,cmd,new Date(cmd.at));persist({...latest,state,history:[...latest.history,cmd],pending:caps.current.user?[...latest.pending,cmd]:latest.pending});void flush();}catch(e){const msg=e instanceof Error?e.message:'Não foi possível salvar.';notify(msg);throw e;}},[persist,flush,notify]);
- useEffect(()=>{if(ready){document.body.classList.toggle('theme-light',envelope.state.theme==='light');}},[ready,envelope.state.theme]);
- const exportData=useCallback(()=>{const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),...ref.current},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='forge-meus-dados.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);},[]);
- return <Store.Provider value={{state:envelope.state,ready,demo,capabilities,syncStatus,message,notify,dispatch,retry:()=>{void flush();},exportData}}>{children}</Store.Provider>;
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  applyCommand,
+  initialState,
+  demoState,
+  makeCommand,
+  type AppState,
+  type Command,
+} from '@/lib/domain';
+type Envelope = { state: AppState; pending: Command[]; history: Command[]; version: number };
+type Capabilities = {
+  cloud: boolean;
+  banking: boolean;
+  push: boolean;
+  user: { id: string; email: string } | null;
+};
+type Context = {
+  state: AppState;
+  ready: boolean;
+  demo: boolean;
+  capabilities: Capabilities;
+  syncStatus: string;
+  message: string;
+  notify: (m: string) => void;
+  dispatch: (type: Command['type'], payload: unknown) => void;
+  retry: () => void;
+  exportData: () => void;
+};
+const Store = createContext<Context | null>(null),
+  GUEST = 'forge.app.guest.v1';
+function read(key: string): Envelope | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const e = JSON.parse(raw);
+    if (
+      e.state?.schema !== 1 ||
+      !Array.isArray(e.state.habits) ||
+      !Array.isArray(e.history) ||
+      !Array.isArray(e.pending) ||
+      !e.state.profile
+    )
+      return null;
+    return e;
+  } catch {
+    return null;
+  }
 }
-export function useForge(){const value=useContext(Store);if(!value)throw Error('ForgeProvider ausente');return value;}
+const empty = (): Envelope => ({ state: initialState(), pending: [], history: [], version: 0 });
+export function ForgeProvider({ children }: { children: ReactNode }) {
+  const [envelope, setEnvelope] = useState<Envelope>(empty),
+    ref = useRef(envelope),
+    key = useRef(GUEST),
+    busy = useRef(false);
+  const [ready, setReady] = useState(false),
+    [demo, setDemo] = useState(false),
+    [capabilities, setCapabilities] = useState<Capabilities>({
+      cloud: false,
+      banking: false,
+      push: false,
+      user: null,
+    }),
+    caps = useRef(capabilities),
+    [syncStatus, setSyncStatus] = useState('Neste aparelho'),
+    [message, setMessage] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notify = useCallback((m: string) => {
+    setMessage(m);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setMessage(''), 4000);
+  }, []);
+  const persist = useCallback(
+    (next: Envelope) => {
+      ref.current = next;
+      setEnvelope(next);
+      try {
+        localStorage.setItem(key.current, JSON.stringify(next));
+      } catch {
+        setSyncStatus('Falha ao salvar');
+        notify('O armazenamento está cheio ou indisponível. Exporte seus dados.');
+      }
+    },
+    [notify],
+  );
+  const flush = useCallback(async () => {
+    if (
+      busy.current ||
+      !caps.current.user ||
+      !caps.current.cloud ||
+      key.current.includes('.demo.') ||
+      !ref.current.pending.length
+    )
+      return;
+    if (!navigator.onLine) {
+      setSyncStatus('Offline · salvo no aparelho');
+      return;
+    }
+    busy.current = true;
+    setSyncStatus('Sincronizando…');
+    const batch = ref.current.pending.slice(0, 200);
+    try {
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: ref.current.version, commands: batch }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw Error(body.error || 'Não foi possível sincronizar.');
+      const ack = new Set(batch.map(c => c.id)),
+        rest = ref.current.pending.filter(c => !ack.has(c.id));
+      let state: AppState = body.state;
+      for (const cmd of rest) state = applyCommand(state, cmd, new Date(cmd.at));
+      persist({ ...ref.current, state, pending: rest, version: body.version });
+      setSyncStatus(rest.length ? 'Alterações pendentes' : 'Sincronizado');
+    } catch (e) {
+      setSyncStatus('Sincronização pendente');
+      notify(e instanceof Error ? e.message : 'Seus dados continuam neste aparelho.');
+    } finally {
+      busy.current = false;
+    }
+  }, [notify, persist]);
+  useEffect(() => {
+    let active = true;
+    const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+    setDemo(isDemo);
+    key.current = isDemo ? 'forge.app.demo.v1' : GUEST;
+    const local = isDemo ? { ...empty(), state: demoState() } : read(GUEST) || empty();
+    ref.current = local;
+    setEnvelope(local);
+    setReady(true);
+    if (isDemo) return;
+    fetch('/api/session')
+      .then(r => r.json())
+      .then(async (c: Capabilities) => {
+        if (!active) return;
+        caps.current = c;
+        setCapabilities(c);
+        if (!c.user || !c.cloud) return;
+        key.current = `forge.app.user.${c.user.id}.v1`;
+        const cached = read(key.current);
+        if (cached) persist(cached);
+        const response = await fetch('/api/state');
+        if (!response.ok) throw Error('Não foi possível carregar a conta.');
+        const remote = await response.json();
+        if (!active) return;
+        if (remote.state) {
+          const pending = cached?.pending || [];
+          let state: AppState = remote.state;
+          for (const cmd of pending) state = applyCommand(state, cmd, new Date(cmd.at));
+          persist({ state, pending, version: remote.version, history: cached?.history || [] });
+        } else {
+          const guest = read(GUEST) || empty();
+          persist(cached || { ...guest, pending: guest.history });
+        }
+        await flush();
+        setSyncStatus(ref.current.pending.length ? 'Alterações pendentes' : 'Sincronizado');
+      })
+      .catch(() => {
+        if (active) setSyncStatus('Offline · salvo no aparelho');
+      });
+    return () => {
+      active = false;
+    };
+  }, [persist, flush]);
+  useEffect(() => {
+    const online = () => {
+      void flush();
+    };
+    const storage = (e: StorageEvent) => {
+      if (e.key === key.current && !busy.current) {
+        const next = read(key.current);
+        if (next) {
+          ref.current = next;
+          setEnvelope(next);
+        }
+      }
+    };
+    addEventListener('online', online);
+    addEventListener('storage', storage);
+    const poll = setInterval(() => {
+      void flush();
+    }, 12000);
+    return () => {
+      removeEventListener('online', online);
+      removeEventListener('storage', storage);
+      clearInterval(poll);
+    };
+  }, [flush]);
+  const dispatch = useCallback(
+    (type: Command['type'], payload: unknown) => {
+      const cmd = makeCommand(type, payload);
+      const latest = read(key.current) || ref.current;
+      try {
+        const state = applyCommand(latest.state, cmd, new Date(cmd.at));
+        persist({
+          ...latest,
+          state,
+          history: [...latest.history, cmd],
+          pending: caps.current.user ? [...latest.pending, cmd] : latest.pending,
+        });
+        void flush();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Não foi possível salvar.';
+        notify(msg);
+        throw e;
+      }
+    },
+    [persist, flush, notify],
+  );
+  useEffect(() => {
+    if (ready) {
+      document.body.classList.toggle('theme-light', envelope.state.theme === 'light');
+    }
+  }, [ready, envelope.state.theme]);
+  const exportData = useCallback(() => {
+    const blob = new Blob(
+        [JSON.stringify({ exportedAt: new Date().toISOString(), ...ref.current }, null, 2)],
+        { type: 'application/json' },
+      ),
+      url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'forge-meus-dados.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, []);
+  return (
+    <Store.Provider
+      value={{
+        state: envelope.state,
+        ready,
+        demo,
+        capabilities,
+        syncStatus,
+        message,
+        notify,
+        dispatch,
+        retry: () => {
+          void flush();
+        },
+        exportData,
+      }}
+    >
+      {children}
+    </Store.Provider>
+  );
+}
+export function useForge() {
+  const value = useContext(Store);
+  if (!value) throw Error('ForgeProvider ausente');
+  return value;
+}
