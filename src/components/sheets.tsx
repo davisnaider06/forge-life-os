@@ -124,6 +124,7 @@ function SheetContent({
   const { state, dispatch, notify, capabilities, demo } = useForge(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
+    [loginEmail, setLoginEmail] = useState(''),
     st = stats(state);
   function submit(
     type: Command['type'],
@@ -585,7 +586,7 @@ function SheetContent({
         <p>
           {capabilities.user
             ? capabilities.user.email
-            : 'Entre por um link no email para sincronizar entre seus dispositivos.'}
+            : 'Entre com um código enviado por email para sincronizar entre seus dispositivos.'}
         </p>
         {demo ? (
           <p>Saia do modo demonstração para conectar sua conta.</p>
@@ -604,6 +605,54 @@ function SheetContent({
           >
             Sair da conta
           </button>
+        ) : loginEmail ? (
+          <form
+            onSubmit={async e => {
+              e.preventDefault();
+              setBusy(true);
+              try {
+                const code = String(new FormData(e.currentTarget).get('code')).trim();
+                const result = await client?.auth.verifyOtp({
+                  email: loginEmail,
+                  token: code,
+                  type: 'email',
+                });
+                if (result?.error) throw result.error;
+                location.href = '/';
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Código inválido ou expirado.');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p>
+              Digite o código de 6 dígitos enviado para <strong>{loginEmail}</strong>.
+            </p>
+            <Field
+              label="Código"
+              name="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              autoFocus
+            />
+            {failure}
+            <button className="primary-button" disabled={busy}>
+              {busy ? 'Confirmando…' : 'Confirmar código'}
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                setLoginEmail('');
+                setError('');
+              }}
+            >
+              Usar outro email
+            </button>
+          </form>
         ) : (
           <form
             onSubmit={async e => {
@@ -611,15 +660,12 @@ function SheetContent({
               setBusy(true);
               try {
                 const email = String(new FormData(e.currentTarget).get('email'));
-                const result = await client?.auth.signInWithOtp({
-                  email,
-                  options: { emailRedirectTo: location.origin + '/auth/callback' },
-                });
+                const result = await client?.auth.signInWithOtp({ email });
                 if (result?.error) throw result.error;
-                notify('Confira seu email para entrar.');
-                close();
+                setLoginEmail(email);
+                setError('');
               } catch (e) {
-                setError(e instanceof Error ? e.message : 'Não foi possível enviar o link.');
+                setError(e instanceof Error ? e.message : 'Não foi possível enviar o código.');
               } finally {
                 setBusy(false);
               }
@@ -628,7 +674,7 @@ function SheetContent({
             <Field label="Seu email" name="email" type="email" required autoComplete="email" />
             {failure}
             <button className="primary-button" disabled={busy}>
-              {busy ? 'Enviando…' : 'Receber link de acesso'}
+              {busy ? 'Enviando…' : 'Receber código de acesso'}
             </button>
           </form>
         )}
