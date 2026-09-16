@@ -8,3 +8,6 @@ coverage/
 test-results/
 playwright-report/
 .vercel/
+
+.vercel
+.env*
