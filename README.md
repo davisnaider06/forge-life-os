@@ -57,3 +57,9 @@ Manifesto e service worker são servidos na versão de produção. Push requer H
 - Confirmar backup e exportação dos dados.
 
 Validação local em 16/09/2026: nove testes passaram e a compilação de produção concluiu. Navegação nas quatro telas conferida no navegador. Supabase, bancos e push ainda não foram validados de ponta a ponta.
+
+## Supabase deste projeto
+
+A migration 001 já foi aplicada ao projeto `fggzqicdvxmjakvbfxwd` em 16/09/2026. Não execute novamente nesse banco. O script SQL pode ser usado uma vez em um banco novo.
+
+O login local está configurado para `http://localhost:4180/auth/callback`. Depois de preencher as chaves no `.env.local`, execute `node scripts/check-supabase.mjs` para verificar acesso do servidor às tabelas e bloqueio de acesso anônimo. Essa verificação não cria registros e não imprime chaves ou dados de usuários. Ela não substitui o teste real de login e sincronização.

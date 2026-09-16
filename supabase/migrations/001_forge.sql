@@ -1,3 +1,4 @@
+begin;
 -- Execute once in the Supabase SQL editor. No financial data or credentials are seeded.
 create table if not exists public.forge_documents (
  user_id uuid primary key references auth.users(id) on delete cascade,
@@ -31,3 +32,6 @@ create policy "Read own document" on public.forge_documents for select to authen
 create policy "Read own bank items" on public.forge_bank_items for select to authenticated using ((select auth.uid()) = user_id);
 create index if not exists forge_bank_items_user on public.forge_bank_items(user_id);
 create index if not exists forge_push_user on public.forge_push_subscriptions(user_id);
+
+commit;
+
