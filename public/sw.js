@@ -1,0 +1,13 @@
+/* Only public shell/assets are cached. Auth, API responses and bank data never are. */
+const CACHE='forge-shell-v1';
+const PAGES=['/','/metas','/financas','/perfil'];
+const ASSETS=['/assets/home-hero.webp','/assets/workout-hero.webp','/assets/fonts/bebas-neue-latin-400-normal.woff2','/assets/fonts/dm-sans-latin-400-normal.woff2','/assets/fonts/dm-sans-latin-500-normal.woff2','/assets/fonts/dm-sans-latin-700-normal.woff2','/icons/icon-192.png','/icons/icon-512.png'];
+self.addEventListener('install',event=>{event.waitUntil((async()=>{const cache=await caches.open(CACHE);await cache.addAll(ASSETS);for(const path of PAGES){const response=await fetch(path,{cache:'reload'});if(!response.ok)throw Error('Shell unavailable');const html=await response.clone().text();await cache.put(path,response);const assets=[...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+[^" ]*)"/g)].map(m=>m[1].replace(/&amp;/g,'&'));for(const asset of new Set(assets)){const r=await fetch(asset);if(r.ok)await cache.put(asset,r);}}})());});
+self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith('forge-shell-')&&name!==CACHE)await caches.delete(name);await self.clients.claim();})());});
+self.addEventListener('fetch',event=>{const req=event.request,url=new URL(req.url);if(req.method!=='GET'||url.origin!==location.origin||url.pathname.startsWith('/api/')||url.pathname.startsWith('/auth/')||url.searchParams.has('_rsc')||req.headers.has('rsc'))return;
+ if(req.mode==='navigate'&&PAGES.includes(url.pathname)){event.respondWith(fetch(req).catch(async()=>{const cache=await caches.open(CACHE);return await cache.match(url.pathname)||Response.error();}));return;}
+ if(url.pathname.startsWith('/assets/')||url.pathname.startsWith('/icons/')||url.pathname.startsWith('/_next/static/'))event.respondWith((async()=>{const cache=await caches.open(CACHE),stored=await cache.match(req);if(stored)return stored;const response=await fetch(req);if(response.ok)await cache.put(req,response.clone());return response;})());
+});
+self.addEventListener('push',event=>{let data={title:'FORGE',body:'Cada dia conta.',url:'/'};try{if(event.data)data={...data,...event.data.json()};}catch{}event.waitUntil(self.registration.showNotification(String(data.title),{body:String(data.body),icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',data:{url:'/'},tag:'forge-reminder'}));});
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil((async()=>{const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});for(const c of clients)if(new URL(c.url).origin===location.origin)return c.focus();return self.clients.openWindow('/');})());});
+

@@ -1,0 +1,10 @@
+GSAP 3.15.0
+Copyright GreenSock / Webflow. License notices in dist/vendor/gsap.min.js are preserved.
+
+The official package declares:
+Standard 'no charge' license: https://gsap.com/standard-license.
+
+Official package: https://www.npmjs.com/package/gsap
+Official license: https://gsap.com/standard-license
+
+The npm package does not include a standalone LICENSE file. This notice records the license link supplied by its package.json; it is not a replacement license.
