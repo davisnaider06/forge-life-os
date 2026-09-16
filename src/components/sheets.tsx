@@ -611,7 +611,7 @@ function SheetContent({
               e.preventDefault();
               setBusy(true);
               try {
-                const code = String(new FormData(e.currentTarget).get('code')).trim();
+                const code = String(new FormData(e.currentTarget).get('code')).replace(/\s/g, '');
                 const result = await client?.auth.verifyOtp({
                   email: loginEmail,
                   token: code,
@@ -627,7 +627,8 @@ function SheetContent({
             }}
           >
             <p>
-              Digite o código de 6 dígitos enviado para <strong>{loginEmail}</strong>.
+              Digite o código enviado para <strong>{loginEmail}</strong>. Se o email trouxer apenas
+              um link, abra-o neste mesmo navegador.
             </p>
             <Field
               label="Código"
@@ -660,7 +661,10 @@ function SheetContent({
               setBusy(true);
               try {
                 const email = String(new FormData(e.currentTarget).get('email'));
-                const result = await client?.auth.signInWithOtp({ email });
+                const result = await client?.auth.signInWithOtp({
+                  email,
+                  options: { emailRedirectTo: location.origin + '/auth/callback' },
+                });
                 if (result?.error) throw result.error;
                 setLoginEmail(email);
                 setError('');

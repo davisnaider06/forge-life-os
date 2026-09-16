@@ -30,7 +30,7 @@ Login, sincronização, importação bancária e push possuem implementação, m
 
 1. Copie `.env.example` para `.env.local` e preencha as variáveis do ambiente. Nunca envie esse arquivo ao GitHub.
 2. Crie um projeto Supabase e execute `supabase/migrations/001_forge.sql` no SQL Editor desse projeto.
-3. Configure a URL do app e a URL de retorno `/auth/callback` no Supabase Auth. O login usa email com magic link.
+3. Configure a URL do app e a URL de retorno `/auth/callback` no Supabase Auth. O login usa um código enviado por email. Em Authentication → Emails, inclua `{{ .Token }}` nos templates "Magic Link" e "Confirm signup"; sem isso o Supabase envia só o link, que funciona apenas no mesmo navegador.
 4. Configure URL, chave pública e chave de serviço do Supabase no ambiente do app. A chave de serviço fica exclusivamente no servidor.
 5. Para publicar na Vercel, importe o repositório, configure as mesmas variáveis com a URL pública e valide login e sincronização entre dois dispositivos.
 
