@@ -1600,13 +1600,10 @@ button.panel:active {
   body {
     height: 100%;
     background: var(--bg);
+    overflow: hidden;
     overscroll-behavior: none;
   }
   .device {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
     height: var(--app-height, 100dvh);
     max-width: none;
   }

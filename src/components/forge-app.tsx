@@ -69,9 +69,14 @@ export function ForgeApp({ screen }: { screen: Screen }) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, []);
   useEffect(() => {
-    // iOS standalone PWAs can report CSS viewport units taller than the drawn area.
-    const fit = () =>
-      document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+    // iOS home-screen apps with a translucent status bar report a viewport shorter than the screen.
+    const fit = () => {
+      const iosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true,
+        long = Math.max(window.screen.width, window.screen.height),
+        short = Math.min(window.screen.width, window.screen.height),
+        height = iosApp ? (innerHeight > innerWidth ? long : short) : innerHeight;
+      document.documentElement.style.setProperty('--app-height', height + 'px');
+    };
     fit();
     addEventListener('resize', fit);
     addEventListener('orientationchange', fit);
