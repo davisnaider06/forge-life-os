@@ -1862,6 +1862,10 @@ button.panel:active {
 .bank-connect-card .icon {
   flex-shrink: 0;
 }
+.pluggy-host [class*='_modal-overlay'] {
+  position: absolute !important;
+  height: var(--app-height, 100dvh) !important;
+}
 .finance-account-label {
   margin-top: 15px;
   font-size: 11px;

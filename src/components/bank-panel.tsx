@@ -1,15 +1,17 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForge } from './store';
 import { money } from '@/lib/domain';
 const PluggyConnect = dynamic(() => import('react-pluggy-connect').then(m => m.PluggyConnect), {
   ssr: false,
 });
+const MEU_PLUGGY_CONNECTOR = 200;
+const sheet = () => document.querySelector<HTMLDialogElement>('dialog.sheet');
 export function BankPanel() {
   const { state, capabilities, demo, notify } = useForge(),
     [token, setToken] = useState(''),
-    [sandbox, setSandbox] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [selected, setSelected] = useState<string | null>(null);
@@ -36,8 +38,8 @@ export function BankPanel() {
     <>
       <h2>Bancos e carteiras.</h2>
       <p>
-        Conecte suas contas pelo ambiente seguro do provedor. A disponibilidade depende da
-        instituição.
+        Conecte o seu Meu Pluggy para trazer as contas que você já autorizou lá. Os dados são
+        atualizados uma vez por dia.
       </p>
       {state.accounts.map(a => (
         <button
@@ -100,7 +102,7 @@ export function BankPanel() {
                 const res = await fetch('/api/banks/token', { method: 'POST' }),
                   data = await res.json();
                 if (!res.ok) throw Error(data.error || 'Não foi possível iniciar.');
-                setSandbox(data.sandbox);
+                sheet()?.close();
                 setToken(data.accessToken);
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Falha na conexão.');
@@ -109,7 +111,7 @@ export function BankPanel() {
               }
             }}
           >
-            {busy ? 'Conectando…' : 'Conectar banco ou carteira'}
+            {busy ? 'Conectando…' : 'Conectar Meu Pluggy'}
           </button>
           {state.accounts.length > 0 && (
             <button className="text-button bank-sync" disabled={busy} onClick={() => sync()}>
@@ -123,24 +125,34 @@ export function BankPanel() {
           {error}
         </p>
       )}
-      {token && (
-        <PluggyConnect
-          connectToken={token}
-          includeSandbox={sandbox}
-          theme="dark"
-          language="pt"
-          countries={['BR']}
-          onClose={() => setToken('')}
-          onSuccess={({ item }) => {
-            setToken('');
-            void sync(item.id);
-          }}
-          onError={({ message }) => {
-            setError(message);
-            setToken('');
-          }}
-        />
-      )}
+      {token &&
+        createPortal(
+          <div className="pluggy-host">
+            <PluggyConnect
+              connectToken={token}
+              connectorIds={[MEU_PLUGGY_CONNECTOR]}
+              selectedConnectorId={MEU_PLUGGY_CONNECTOR}
+              theme="dark"
+              language="pt"
+              countries={['BR']}
+              onClose={() => {
+                setToken('');
+                sheet()?.showModal();
+              }}
+              onSuccess={({ item }) => {
+                setToken('');
+                sheet()?.showModal();
+                void sync(item.id);
+              }}
+              onError={({ message }) => {
+                setError(message);
+                setToken('');
+                sheet()?.showModal();
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

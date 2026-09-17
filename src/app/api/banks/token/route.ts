@@ -6,10 +6,7 @@ export async function POST(req: Request) {
     sameOrigin(req);
     const user = await requireUser(),
       token = await connectToken(user.id);
-    return NextResponse.json({
-      accessToken: token.accessToken,
-      sandbox: process.env.PLUGGY_SANDBOX === 'true',
-    });
+    return NextResponse.json({ accessToken: token.accessToken });
   } catch (e) {
     return fail(e);
   }
