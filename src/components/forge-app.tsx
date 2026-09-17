@@ -68,6 +68,18 @@ export function ForgeApp({ screen }: { screen: Screen }) {
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production')
       navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, []);
+  useEffect(() => {
+    // iOS standalone PWAs can report CSS viewport units taller than the drawn area.
+    const fit = () =>
+      document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+    fit();
+    addEventListener('resize', fit);
+    addEventListener('orientationchange', fit);
+    return () => {
+      removeEventListener('resize', fit);
+      removeEventListener('orientationchange', fit);
+    };
+  }, []);
   const onboarded = ready && !needsAuth && state.profile.onboarded;
   return (
     <div className="device">
