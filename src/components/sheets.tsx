@@ -124,7 +124,10 @@ function SheetContent({
   const { state, dispatch, notify, capabilities, demo } = useForge(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [loginEmail, setLoginEmail] = useState(''),
+    [authMode, setAuthMode] = useState<
+      'login' | 'signup' | 'reset' | 'password' | 'sent' | 'reset-sent' | 'password-done'
+    >('login'),
+    [sentEmail, setSentEmail] = useState(''),
     st = stats(state);
   function submit(
     type: Command['type'],
@@ -579,14 +582,15 @@ function SheetContent({
   }
   if (sheet.type === 'banks') return <BankPanel />;
   if (sheet.type === 'account') {
-    const client = browserSupabase();
+    const client = browserSupabase(),
+      phone = capabilities.user?.phone;
     return (
       <>
         <h2>{capabilities.user ? 'Sua conta.' : 'Leve seu progresso com você.'}</h2>
         <p>
           {capabilities.user
-            ? capabilities.user.email
-            : 'Entre com um código enviado por email para sincronizar entre seus dispositivos.'}
+            ? capabilities.user.email + (phone ? ' · ' + phone : '')
+            : 'Crie uma conta com email e senha para sincronizar entre seus dispositivos.'}
         </p>
         {demo ? (
           <p>Saia do modo demonstração para conectar sua conta.</p>
@@ -596,80 +600,142 @@ function SheetContent({
             projeto.
           </p>
         ) : capabilities.user ? (
-          <button
-            className="primary-button"
-            onClick={async () => {
-              await client?.auth.signOut();
-              location.href = '/';
-            }}
-          >
-            Sair da conta
-          </button>
-        ) : loginEmail ? (
-          <form
-            onSubmit={async e => {
-              e.preventDefault();
-              setBusy(true);
-              try {
-                const code = String(new FormData(e.currentTarget).get('code')).replace(/\s/g, '');
-                const result = await client?.auth.verifyOtp({
-                  email: loginEmail,
-                  token: code,
-                  type: 'email',
-                });
-                if (result?.error) throw result.error;
-                location.href = '/';
-              } catch (e) {
-                setError(e instanceof Error ? e.message : 'Código inválido ou expirado.');
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
+          authMode === 'password-done' ? (
+            <>
+              <p>Senha atualizada.</p>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setAuthMode('login');
+                }}
+              >
+                Voltar
+              </button>
+            </>
+          ) : authMode === 'password' ? (
+            <form
+              onSubmit={async e => {
+                e.preventDefault();
+                setBusy(true);
+                try {
+                  const data = new FormData(e.currentTarget),
+                    password = String(data.get('password')),
+                    confirm = String(data.get('confirm'));
+                  if (password !== confirm) throw Error('As senhas não coincidem.');
+                  const result = await client?.auth.updateUser({ password });
+                  if (result?.error) throw result.error;
+                  setAuthMode('password-done');
+                  setError('');
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Não foi possível trocar a senha.');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Field
+                label="Nova senha"
+                name="password"
+                type="password"
+                minLength={8}
+                required
+                autoComplete="new-password"
+              />
+              <Field
+                label="Confirmar nova senha"
+                name="confirm"
+                type="password"
+                minLength={8}
+                required
+                autoComplete="new-password"
+              />
+              {failure}
+              <button className="primary-button" disabled={busy}>
+                {busy ? 'Salvando…' : 'Salvar nova senha'}
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy}
+                onClick={() => {
+                  setAuthMode('login');
+                  setError('');
+                }}
+              >
+                Cancelar
+              </button>
+            </form>
+          ) : (
+            <>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setAuthMode('password');
+                  setError('');
+                }}
+              >
+                Alterar senha
+              </button>
+              <button
+                className="danger-button"
+                onClick={async () => {
+                  await client?.auth.signOut();
+                  location.href = '/';
+                }}
+              >
+                Sair da conta
+              </button>
+            </>
+          )
+        ) : authMode === 'sent' ? (
+          <>
             <p>
-              Digite o código enviado para <strong>{loginEmail}</strong>. Se o email trouxer apenas
-              um link, abra-o neste mesmo navegador.
+              Enviamos um link de confirmação para <strong>{sentEmail}</strong>. Abra-o neste mesmo
+              navegador para ativar sua conta.
             </p>
-            <Field
-              label="Código"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              autoFocus
-            />
-            {failure}
-            <button className="primary-button" disabled={busy}>
-              {busy ? 'Confirmando…' : 'Confirmar código'}
-            </button>
             <button
               type="button"
               className="text-button"
-              disabled={busy}
               onClick={() => {
-                setLoginEmail('');
+                setAuthMode('login');
                 setError('');
               }}
             >
-              Usar outro email
+              Voltar para entrar
             </button>
-          </form>
-        ) : (
+          </>
+        ) : authMode === 'reset-sent' ? (
+          <>
+            <p>
+              Enviamos um link de redefinição de senha para <strong>{sentEmail}</strong>.
+            </p>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setAuthMode('login');
+                setError('');
+              }}
+            >
+              Voltar para entrar
+            </button>
+          </>
+        ) : authMode === 'reset' ? (
           <form
             onSubmit={async e => {
               e.preventDefault();
               setBusy(true);
               try {
                 const email = String(new FormData(e.currentTarget).get('email'));
-                const result = await client?.auth.signInWithOtp({
-                  email,
-                  options: { emailRedirectTo: location.origin + '/auth/callback' },
+                const result = await client?.auth.resetPasswordForEmail(email, {
+                  redirectTo: location.origin + '/auth/callback',
                 });
                 if (result?.error) throw result.error;
-                setLoginEmail(email);
+                setSentEmail(email);
+                setAuthMode('reset-sent');
                 setError('');
               } catch (e) {
-                setError(e instanceof Error ? e.message : 'Não foi possível enviar o código.');
+                setError(e instanceof Error ? e.message : 'Não foi possível enviar o email.');
               } finally {
                 setBusy(false);
               }
@@ -678,9 +744,157 @@ function SheetContent({
             <Field label="Seu email" name="email" type="email" required autoComplete="email" />
             {failure}
             <button className="primary-button" disabled={busy}>
-              {busy ? 'Enviando…' : 'Receber código de acesso'}
+              {busy ? 'Enviando…' : 'Enviar link de redefinição'}
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                setAuthMode('login');
+                setError('');
+              }}
+            >
+              Voltar
             </button>
           </form>
+        ) : (
+          <>
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={'text-button' + (authMode !== 'signup' ? ' active' : '')}
+                onClick={() => {
+                  setAuthMode('login');
+                  setError('');
+                }}
+              >
+                Entrar
+              </button>
+              <button
+                type="button"
+                className={'text-button' + (authMode === 'signup' ? ' active' : '')}
+                onClick={() => {
+                  setAuthMode('signup');
+                  setError('');
+                }}
+              >
+                Criar conta
+              </button>
+            </div>
+            {authMode === 'signup' ? (
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  setBusy(true);
+                  try {
+                    const data = new FormData(e.currentTarget),
+                      email = String(data.get('email')),
+                      password = String(data.get('password')),
+                      confirm = String(data.get('confirm')),
+                      cel = String(data.get('phone')).replace(/\D/g, '');
+                    if (password !== confirm) throw Error('As senhas não coincidem.');
+                    if (cel.length < 10 || cel.length > 11)
+                      throw Error('Informe um celular válido, com DDD.');
+                    const result = await client?.auth.signUp({
+                      email,
+                      password,
+                      options: {
+                        data: { phone: cel },
+                        emailRedirectTo: location.origin + '/auth/callback',
+                      },
+                    });
+                    if (result?.error) throw result.error;
+                    if (result?.data.session) {
+                      location.href = '/';
+                      return;
+                    }
+                    setSentEmail(email);
+                    setAuthMode('sent');
+                    setError('');
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Não foi possível criar a conta.');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Field label="Seu email" name="email" type="email" required autoComplete="email" />
+                <Field
+                  label="Celular"
+                  name="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  required
+                  autoComplete="tel"
+                  placeholder="(12) 91234-5678"
+                />
+                <Field
+                  label="Senha"
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                />
+                <Field
+                  label="Confirmar senha"
+                  name="confirm"
+                  type="password"
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                />
+                {failure}
+                <button className="primary-button" disabled={busy}>
+                  {busy ? 'Criando conta…' : 'Criar conta'}
+                </button>
+              </form>
+            ) : (
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  setBusy(true);
+                  try {
+                    const data = new FormData(e.currentTarget),
+                      email = String(data.get('email')),
+                      password = String(data.get('password'));
+                    const result = await client?.auth.signInWithPassword({ email, password });
+                    if (result?.error) throw result.error;
+                    location.href = '/';
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Email ou senha inválidos.');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Field label="Seu email" name="email" type="email" required autoComplete="email" />
+                <Field
+                  label="Senha"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                />
+                {failure}
+                <button className="primary-button" disabled={busy}>
+                  {busy ? 'Entrando…' : 'Entrar'}
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => {
+                    setAuthMode('reset');
+                    setError('');
+                  }}
+                >
+                  Esqueci minha senha
+                </button>
+              </form>
+            )}
+          </>
         )}
       </>
     );

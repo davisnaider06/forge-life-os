@@ -7,7 +7,14 @@ export async function GET() {
     try {
       const client = await authClient(),
         result = await client.auth.getUser();
-      if (result.data.user) user = { id: result.data.user.id, email: result.data.user.email || '' };
+      if (result.data.user)
+        user = {
+          id: result.data.user.id,
+          email: result.data.user.email || '',
+          phone: typeof result.data.user.user_metadata?.phone === 'string'
+            ? result.data.user.user_metadata.phone
+            : undefined,
+        };
     } catch {}
   }
   return NextResponse.json({

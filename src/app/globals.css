@@ -1157,6 +1157,25 @@ small {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+  background: #0b1416;
+  border: 1px solid #304245;
+  border-radius: 14px;
+  padding: 4px;
+}
+.auth-tabs .text-button {
+  flex: 1;
+  text-align: center;
+  border-radius: 10px;
+  padding: 8px 0;
+  color: #9cafb2;
+}
+.auth-tabs .text-button.active {
+  background: #17272a;
+  color: #f6ffff;
+}
 .primary-button {
   width: 100%;
   padding: 14px 18px;

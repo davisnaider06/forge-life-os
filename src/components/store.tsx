@@ -21,7 +21,7 @@ type Capabilities = {
   cloud: boolean;
   banking: boolean;
   push: boolean;
-  user: { id: string; email: string } | null;
+  user: { id: string; email: string; phone?: string } | null;
 };
 type Context = {
   state: AppState;
