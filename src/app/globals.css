@@ -1596,12 +1596,15 @@ button.panel:active {
   color: #60767a;
 }
 @media (max-width: 520px) {
-  html,
+  html {
+    height: var(--app-height, 100%);
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--bg);
+  }
   body {
     height: 100%;
     background: var(--bg);
-    overflow: hidden;
-    overscroll-behavior: none;
   }
   .device {
     height: var(--app-height, 100dvh);
@@ -1609,7 +1612,7 @@ button.panel:active {
   }
 
   .app-scroll {
-    padding-top: max(17px, env(safe-area-inset-top));
+    padding-top: max(17px, calc(env(safe-area-inset-top) + 12px));
     padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
   .app-header {
