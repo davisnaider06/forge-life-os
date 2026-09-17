@@ -1596,8 +1596,11 @@ button.panel:active {
   color: #60767a;
 }
 @media (max-width: 520px) {
+  html,
   body {
+    height: 100%;
     background: var(--bg);
+    overscroll-behavior: none;
   }
   .device {
     position: fixed;
@@ -1605,6 +1608,15 @@ button.panel:active {
     height: auto;
     max-width: none;
   }
+}
+@media (max-width: 520px) and (display-mode: standalone) {
+  .device {
+    bottom: auto;
+    height: 100vh;
+    height: 100lvh;
+  }
+}
+@media (max-width: 520px) {
   .app-scroll {
     padding-top: max(17px, env(safe-area-inset-top));
     padding-bottom: calc(100px + env(safe-area-inset-bottom));

@@ -82,7 +82,7 @@ export function BankPanel() {
       {demo ? (
         <p>Conexões reais ficam desativadas no modo demonstração.</p>
       ) : !capabilities.user ? (
-        <p>Entre na sua conta em Perfil → Salvar na nuvem para conectar um banco.</p>
+        <p>Sua sessão expirou. Recarregue o app e entre de novo para conectar um banco.</p>
       ) : !capabilities.banking ? (
         <p>
           A conexão bancária precisa ser ativada neste projeto. Enquanto isso, você pode registrar
