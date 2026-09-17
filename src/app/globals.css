@@ -396,17 +396,26 @@ button.panel:active {
   width: 21px;
   height: 21px;
 }
+.stat-card > :last-child {
+  min-width: 0;
+  flex: 1;
+}
 .stat-card small {
   font-size: 11px;
   color: #a9bcc2;
   display: block;
   margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stat-card strong {
-  font-size: 21px;
+  font-size: clamp(15px, 5.4vw, 21px);
   letter-spacing: -0.7px;
   white-space: nowrap;
-  display: inline-block;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: rise-in 0.6s var(--ease) both 0.15s;
 }
 .today-panel {

@@ -81,13 +81,28 @@ const txSchema = z.object({
   category: z.string().nullable().optional(),
   providerId: z.string().nullable().optional(),
 });
-function category(value: string | null | undefined) {
-  if (!value) return 'Outros';
-  if (/food|grocer|restaurant/i.test(value)) return 'Comida';
-  if (/transport|bus|fuel|taxi/i.test(value)) return 'Transporte';
-  if (/education|school|course/i.test(value)) return 'Estudos';
-  if (/entertainment|leisure/i.test(value)) return 'Lazer';
-  if (/salary/i.test(value)) return 'Salário';
+const rules: [RegExp, string][] = [
+  [
+    /food|grocer|restaurant|supermarket|padaria|mercado|superm|restaurante|lanche|pizza|ifood|burger|a[çc]a[íi]|caf[ée]|emp[óo]rio|hortifruti|a[çc]ougue|doceria|sorvete/i,
+    'Comida',
+  ],
+  [
+    /transport|fuel|taxi|ride|uber|99app|99pop|posto|combust[íi]vel|shell|ipiranga|petrobras|estacion|passagem|[ôo]nibus|metr[ôo]|pedagio|ped[áa]gio/i,
+    'Transporte',
+  ],
+  [
+    /education|school|course|curso|faculdade|fatec|udemy|alura|livraria|escola|educa|apostila/i,
+    'Estudos',
+  ],
+  [
+    /entertainment|leisure|netflix|spotify|cinema|steam|game|academia|smartfit|compassfit|show|ingresso|disney|hbo|max\b|prime\s*video|bar\b|pub\b/i,
+    'Lazer',
+  ],
+  [/salary|sal[áa]rio|adiantamento|pro\s*labore|remunera[çc][ãa]o|vale\b/i, 'Salário'],
+];
+function category(value: string | null | undefined, description = '') {
+  const text = `${value || ''} ${description}`;
+  for (const [pattern, name] of rules) if (pattern.test(text)) return name;
   return 'Outros';
 }
 export async function syncItem(userId: string, itemId: string) {
@@ -139,7 +154,7 @@ export async function syncItem(userId: string, itemId: string) {
           name: tx.description.slice(0, 200),
           cents: Math.abs(Math.round(amount * 100)),
           type: tx.type === 'CREDIT' ? 'income' : 'expense',
-          category: category(tx.category),
+          category: category(tx.category, tx.description),
           date: tx.date.slice(0, 10),
           source: 'pluggy',
           pending: tx.status === 'PENDING',

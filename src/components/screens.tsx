@@ -143,7 +143,7 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
         </div>
       </section>
       <section className="stats-grid" aria-label="Resumo do dia">
-        <Stat label="Saldo do mês" value={money(f.balance)} icon="wallet" />
+        <Stat label="Saldo em conta" value={money(f.balance)} icon="wallet" />
         <Stat label="XP da semana" value={'+' + (demo ? 640 : st.weekXp) + ' XP'} icon="star" />
         <button
           className="panel stat-card"
@@ -365,21 +365,18 @@ export function FinanceScreen({
       <section className="panel balance-panel">
         <div className="balance-header">
           <div>
-            <h2>Saldo do mês</h2>
-            <p className="capitalize">
-              {new Date(month + '-15').toLocaleDateString('pt-BR', {
-                month: 'long',
-                year: 'numeric',
-              })}
+            <h2>Saldo em conta</h2>
+            <p>
+              {state.accounts.length ? 'Somando suas contas conectadas' : 'Pelos seus registros'}
             </p>
           </div>
           <span className="reserve-label">
-            Saldo <Icon name="coins" />
+            Agora <Icon name="coins" />
           </span>
         </div>
         <div className="balance-bottom">
           <Dot value={money(f.balance)} />
-          <div className="capsules" role="img" aria-label="Proporção do saldo sobre as entradas">
+          <div className="capsules" role="img" aria-label="Quanto do mês já foi gasto">
             {Array.from({ length: 6 }, (_, i) => (
               <span key={i} className="capsule">
                 <i
@@ -390,7 +387,7 @@ export function FinanceScreen({
                       '--fill':
                         Math.min(
                           100,
-                          Math.max(0, ((f.income ? f.balance / f.income : 0) * 6 - i) * 100),
+                          Math.max(0, ((f.income ? f.expense / f.income : 0) * 6 - i) * 100),
                         ) + '%',
                     } as CSSProperties
                   }
@@ -401,8 +398,8 @@ export function FinanceScreen({
         </div>
       </section>
       <section className="cashflow">
-        <Stat label="Entradas" value={money(f.income)} icon="wallet" />
-        <Stat label="Saídas" value={money(f.expense)} icon="down" />
+        <Stat label="Cartão de crédito" value={money(f.cardSpend)} icon="wallet" />
+        <Stat label="Pix e débito" value={money(f.cashSpend)} icon="down" />
       </section>
       <div className="section-heading">
         <h2>Categorias</h2>
@@ -422,13 +419,7 @@ export function FinanceScreen({
           >
             <Icon name={i} />
             <span>{c}</span>
-            <Dot
-              value={money(
-                f.entries
-                  .filter(t => t.type === 'expense' && t.category === c)
-                  .reduce((s, t) => s + t.cents, 0),
-              )}
-            />
+            <Dot value={money(f.byCategory[c] || 0)} />
           </button>
         ))}
       </section>

@@ -131,6 +131,57 @@ test('Card charges are separated from cashflow to avoid double counting bill pay
   );
   assert.equal(financeTotals(s, '2026-09').expense, 10000);
 });
+test('Saldo vem das contas; gastos separam cartão de pix/débito e ignoram transferências', () => {
+  const s = ready();
+  s.accounts.push(
+    {
+      id: 'bank',
+      itemId: 'item',
+      name: 'Conta',
+      type: 'BANK',
+      currency: 'BRL',
+      balanceCents: 7200,
+      updatedAt: now.toISOString(),
+    },
+    {
+      id: 'credit',
+      itemId: 'item',
+      name: 'Cartão',
+      type: 'CREDIT',
+      currency: 'BRL',
+      balanceCents: 757100,
+      updatedAt: now.toISOString(),
+    },
+  );
+  const tx = (over: Partial<(typeof s.transactions)[number]>) => ({
+    id: 'tx' + s.transactions.length,
+    name: 'Compra',
+    cents: 1000,
+    type: 'expense' as const,
+    category: 'Outros',
+    date: '2026-09-15',
+    source: 'pluggy' as const,
+    ...over,
+  });
+  s.transactions.push(
+    tx({ accountId: 'credit', cents: 5000 }),
+    tx({ accountId: 'bank', cents: 2000 }),
+    tx({ accountId: 'bank', cents: 90000, name: 'PGTO CARTAO' }),
+    tx({ accountId: 'bank', cents: 31200, name: 'RENDE FACIL     Rende Facil' }),
+    tx({ accountId: 'bank', cents: 100000, type: 'income', name: 'ADIANTAMENTO' }),
+    tx({ accountId: 'bank', cents: 49050, type: 'income', name: 'REND.FACIL Rende Facil' }),
+    tx({ accountId: 'credit', cents: 47700, type: 'income', name: 'PGTO. CASH AG.' }),
+    tx({ accountId: 'credit', cents: 900, pending: true }),
+  );
+  const f = financeTotals(s, '2026-09');
+  assert.equal(f.balance, 7200, 'saldo é o da conta, não o fluxo do mês');
+  assert.equal(f.cardSpend, 5900, 'compra pendente no cartão já conta como gasto');
+  assert.equal(f.cashSpend, 2000, 'pagamento de fatura e aplicação ficam de fora');
+  assert.equal(f.expense, 7900);
+  assert.equal(f.income, 100000, 'resgate não conta como entrada');
+  assert.equal(f.byCategory.Outros, 7900);
+  assert.equal(f.entries.length, 4, 'lista traz gastos dos dois e entradas reais');
+});
 test('Invalid actions never mutate original state', () => {
   const s = ready(),
     before = JSON.stringify(s);

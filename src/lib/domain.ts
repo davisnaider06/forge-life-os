@@ -184,14 +184,40 @@ export function stats(state: AppState, now = new Date()) {
     days,
   };
 }
+// Movimentações entre contas do próprio dono não são ganho nem gasto; o pagamento da
+// fatura repetiria compras já contadas no cartão.
+const internalTransfer = /rende\s*f[áa]cil|aplica[çc][ãa]o|resgate|poupan[çc]a/i,
+  cardPayment = /pgto\.?\s*cart[ãa]o|pagamento\s+(de\s+)?fatura|pgto\.?\s*fatura/i;
 export function financeTotals(state: AppState, month: string) {
-  const creditIds = new Set(state.accounts.filter(a => a.type === 'CREDIT').map(a => a.id));
-  const entries = state.transactions.filter(
-      t => t.date.startsWith(month) && !t.pending && !creditIds.has(t.accountId || ''),
-    ),
-    income = entries.filter(t => t.type === 'income').reduce((s, t) => s + t.cents, 0),
-    expense = entries.filter(t => t.type === 'expense').reduce((s, t) => s + t.cents, 0);
-  return { income, expense, balance: income - expense, entries };
+  const creditIds = new Set(state.accounts.filter(a => a.type === 'CREDIT').map(a => a.id)),
+    bankAccounts = state.accounts.filter(a => a.type !== 'CREDIT'),
+    onCard = (t: Transaction) => creditIds.has(t.accountId || '');
+  // Compras no cartão ficam pendentes até a fatura fechar, mas já são gasto do mês.
+  const counted = state.transactions.filter(
+    t =>
+      t.date.startsWith(month) &&
+      !internalTransfer.test(t.name) &&
+      !(!onCard(t) && cardPayment.test(t.name)),
+  );
+  const sum = (list: Transaction[]) => list.reduce((s, t) => s + t.cents, 0),
+    income = sum(counted.filter(t => t.type === 'income' && !onCard(t))),
+    cardSpend = sum(counted.filter(t => t.type === 'expense' && onCard(t))),
+    cashSpend = sum(counted.filter(t => t.type === 'expense' && !onCard(t))),
+    expense = cardSpend + cashSpend;
+  const byCategory: Record<string, number> = {};
+  for (const t of counted)
+    if (t.type === 'expense') byCategory[t.category] = (byCategory[t.category] || 0) + t.cents;
+  return {
+    income,
+    expense,
+    cardSpend,
+    cashSpend,
+    byCategory,
+    balance: bankAccounts.length
+      ? bankAccounts.reduce((s, a) => s + a.balanceCents, 0)
+      : income - expense,
+    entries: counted.filter(t => t.type === 'expense' || !onCard(t)),
+  };
 }
 function award(s: AppState, key: string, xp: number, day: string, qualifies = true, active = true) {
   s.awards[key] = { xp, day, qualifies, active };
