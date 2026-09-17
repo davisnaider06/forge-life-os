@@ -787,7 +787,30 @@ function SheetContent({
           Depois de instalado, você pode registrar suas ações mesmo sem conexão. A sincronização
           volta quando a internet retornar.
         </p>
+        <ViewportInfo />
       </>
     );
   return null;
+}
+function ViewportInfo() {
+  const [info, setInfo] = useState('');
+  useEffect(() => {
+    const probe = document.createElement('div');
+    probe.style.cssText =
+      'position:fixed;visibility:hidden;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)';
+    document.body.appendChild(probe);
+    const s = getComputedStyle(probe);
+    setInfo(
+      [
+        `janela ${innerWidth}×${innerHeight}`,
+        `tela ${screen.width}×${screen.height}`,
+        `visual ${Math.round(visualViewport?.height || 0)}`,
+        `doc ${document.documentElement.clientHeight}`,
+        `safe ${s.paddingTop}/${s.paddingBottom}`,
+        `standalone ${matchMedia('(display-mode: standalone)').matches}`,
+      ].join(' · '),
+    );
+    probe.remove();
+  }, []);
+  return <p className="field-help">{info}</p>;
 }

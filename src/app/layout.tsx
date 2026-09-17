@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'FORGE — Cada dia conta.',
   description: 'Metas, rotina e finanças. Seu progresso ganha forma.',
   applicationName: 'FORGE',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'FORGE' },
+  appleWebApp: { capable: true, statusBarStyle: 'black', title: 'FORGE' },
   icons: { icon: '/icon.svg', apple: '/icons/apple-touch-icon.png' },
   manifest: '/manifest.webmanifest',
 };
