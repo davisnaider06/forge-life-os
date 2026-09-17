@@ -116,7 +116,7 @@ const ForgeUI = (() => {
     let circles = '';
     for (let i = 0; i < 24; i++) {
       const a = Math.PI + (i * Math.PI) / 23;
-      circles += `<circle class="${i / 23 <= p / 100 ? 'on' : ''}" cx="${70 + 56 * Math.cos(a)}" cy="${73 + 56 * Math.sin(a)}" r="2.9"/>`;
+      circles += `<circle style="--i:${i}" class="${i / 23 <= p / 100 ? 'on' : ''}" cx="${70 + 56 * Math.cos(a)}" cy="${73 + 56 * Math.sin(a)}" r="2.9"/>`;
     }
     return `<svg class="gauge" viewBox="0 0 140 90" role="img" aria-label="${p}% do orçamento usado">${circles}<text x="70" y="57" text-anchor="middle">${p}%</text><text class="gauge-caption" x="70" y="72" text-anchor="middle">${p <= 75 ? 'Sob controle' : 'Acompanhe os gastos'}</text></svg>`;
   }

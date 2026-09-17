@@ -128,7 +128,11 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
         <div className="streak-footer">
           <div className="streak-days">
             {Array.from({ length: 10 }, (_, i) => (
-              <i key={i} className={i < Math.min(st.streak, 10) ? 'lit' : ''} />
+              <i
+                key={i}
+                className={i < Math.min(st.streak, 10) ? 'lit' : ''}
+                style={{ '--i': i } as CSSProperties}
+              />
             ))}
           </div>
           <small>
@@ -338,7 +342,16 @@ export function FinanceScreen({
           <Dot value={money(f.income)} />
           <div className="tiny-bars" aria-hidden="true">
             {Array.from({ length: 23 }, (_, i) => (
-              <i key={i} className={i < 16 && f.income ? 'lit' : ''} />
+              <i
+                key={i}
+                className={i < 16 && f.income ? 'lit' : ''}
+                style={
+                  {
+                    '--i': i,
+                    '--h': 28 + Math.round(72 * Math.abs(Math.sin(i * 0.7))) + '%',
+                  } as CSSProperties
+                }
+              />
             ))}
           </div>
         </div>
@@ -373,6 +386,7 @@ export function FinanceScreen({
                   className="liquid"
                   style={
                     {
+                      '--i': i,
                       '--fill':
                         Math.min(
                           100,
@@ -526,7 +540,7 @@ export function ProfileScreen({ open }: { open: OpenSheet }) {
           ['profile', 'user', 'Editar perfil'],
           ['notifications', 'bell', 'Notificações'],
           ['banks', 'bank', 'Conectar banco'],
-          ['account', 'user', capabilities.user ? 'Minha conta' : 'Salvar na nuvem'],
+          ['account', 'user', 'Minha conta'],
           ['install', 'plus', 'Instalar FORGE'],
         ].map(([type, icon, label]) => (
           <button

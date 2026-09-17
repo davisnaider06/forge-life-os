@@ -21,7 +21,7 @@ export function EnergyButton({ onClick, label }: { onClick: () => void; label: s
           return;
         }
         renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-        renderer.setSize(55, 55);
+        renderer.setSize(60, 60);
         renderer.setClearColor(0, 0);
         const element = host.current;
         element.appendChild(renderer.domElement);

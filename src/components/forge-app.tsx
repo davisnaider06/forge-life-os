@@ -12,6 +12,7 @@ import {
   type Sheet,
 } from './screens';
 import { Onboarding } from './onboarding';
+import { AuthGate } from './auth-gate';
 import { Sheets } from './sheets';
 import { EnergyButton } from './energy-button';
 import { stats } from '@/lib/domain';
@@ -22,14 +23,15 @@ const routes: { screen: Screen; label: string; icon: string; href: string }[] = 
   { screen: 'perfil', label: 'Perfil', icon: 'user', href: '/perfil' },
 ];
 export function ForgeApp({ screen }: { screen: Screen }) {
-  const { ready, state, message, demo, dispatch } = useForge(),
+  const { ready, state, message, demo, dispatch, capabilities } = useForge(),
     [sheet, setSheet] = useState<Sheet | null>(null),
     [month, setMonth] = useState(() => new Date().toLocaleDateString('en-CA').slice(0, 7)),
     [filter, setFilter] = useState<string | null>(null),
     main = useRef<HTMLElement>(null),
-    scroll = useRef<HTMLDivElement>(null);
+    scroll = useRef<HTMLDivElement>(null),
+    needsAuth = ready && !demo && capabilities.cloud && !capabilities.user;
   useEffect(() => {
-    if (!ready || !state.profile.onboarded) return;
+    if (!ready || needsAuth || !state.profile.onboarded) return;
     let disposed = false;
     scroll.current?.scrollTo(0, 0);
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -37,28 +39,36 @@ export function ForgeApp({ screen }: { screen: Screen }) {
         if (disposed || !main.current) return;
         gsap.fromTo(
           main.current.children,
-          { y: 11, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.4, stagger: 0.035, clearProps: 'transform,opacity' },
-        );
-        gsap.fromTo(
-          main.current.querySelectorAll('.progress-fill'),
-          { scaleX: 0.2 },
-          { scaleX: 1, duration: 0.7, ease: 'power3.out', clearProps: 'transform' },
+          { y: 16, opacity: 0, transition: 'none' },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.55,
+            stagger: 0.06,
+            ease: 'power3.out',
+            clearProps: 'transform,opacity,transition',
+          },
         );
       });
     return () => {
       disposed = true;
     };
-  }, [ready, screen, state.profile.onboarded]);
+  }, [ready, needsAuth, screen, state.profile.onboarded]);
   useEffect(() => {
-    if (ready && state.profile.onboarded && !demo && !state.awards['checkin:' + stats(state).day])
+    if (
+      ready &&
+      !needsAuth &&
+      state.profile.onboarded &&
+      !demo &&
+      !state.awards['checkin:' + stats(state).day]
+    )
       dispatch('checkin', {});
-  }, [ready, demo, state, dispatch]);
+  }, [ready, needsAuth, demo, state, dispatch]);
   useEffect(() => {
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production')
       navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, []);
-  const onboarded = ready && state.profile.onboarded;
+  const onboarded = ready && !needsAuth && state.profile.onboarded;
   return (
     <div className="device">
       <div className="app-scroll" ref={scroll}>
@@ -67,6 +77,8 @@ export function ForgeApp({ screen }: { screen: Screen }) {
             <span className="wordmark">FORGE</span>
             <p>Seu próximo passo começa aqui.</p>
           </div>
+        ) : needsAuth ? (
+          <AuthGate />
         ) : !onboarded ? (
           <Onboarding />
         ) : (
