@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useForge } from './store';
 import { Icon, Art, Dot, Progress, Badge, Gauge } from './visuals';
 import { stats, financeTotals, money, type AppState } from '@/lib/domain';
@@ -43,6 +43,32 @@ export function achievements(s: AppState) {
     { name: 'Executor', criterion: 'Nível 20', type: 'laptop', unlocked: st.level >= 20 },
   ];
 }
+// Sugestões que completam as listas quando há menos de cinco itens.
+export const habitIdeas = [
+  { name: 'Ler 10 páginas', xp: 20, art: 'book' },
+  { name: 'Beber 2 L de água', xp: 20, art: 'flame' },
+  { name: 'Caminhar 20 min', xp: 40, art: 'dumbbell' },
+  { name: 'Dormir antes da meia-noite', xp: 40, art: 'flame' },
+  { name: 'Revisar o dia em 5 min', xp: 20, art: 'book' },
+  { name: 'Treinar 45 min', xp: 60, art: 'dumbbell' },
+  { name: 'Estudar 30 min', xp: 40, art: 'book' },
+] as const;
+export const goalIdeas = [
+  { name: 'Reserva de emergência', category: 'Finanças', target: 3000, unit: 'R$', art: 'coins' },
+  { name: 'Ler 6 livros', category: 'Estudos', target: 100, unit: '%', art: 'stack' },
+  { name: 'Treinar 60 dias', category: 'Saúde', target: 60, unit: 'dias', art: 'laptop' },
+  { name: 'Terminar um curso', category: 'Estudos', target: 10, unit: 'módulos', art: 'stack' },
+  { name: 'Projeto pessoal no ar', category: 'Carreira', target: 100, unit: '%', art: 'laptop' },
+] as const;
+const lower = (v: string) => v.trim().toLowerCase();
+// Valor curto para espaços estreitos: R$ 850 · 1,2k · 12k.
+export function compactMoney(cents: number) {
+  const reais = Math.round(Math.abs(cents) / 100),
+    sign = cents < 0 ? '−' : '';
+  if (reais < 1000) return `${sign}R$ ${reais}`;
+  const k = reais / 1000;
+  return sign + (k < 10 ? k.toFixed(1).replace('.', ',').replace(',0', '') : Math.round(k)) + 'k';
+}
 const date = (v: string) =>
   new Date(v + 'T12:00:00')
     .toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
@@ -55,7 +81,7 @@ export function Stat({ label, value, icon }: { label: string; value: string; ico
       </span>
       <div>
         <small>{label}</small>
-        <strong>{value}</strong>
+        <strong style={{ '--chars': value.length } as CSSProperties}>{value}</strong>
       </div>
     </div>
   );
@@ -92,7 +118,10 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
     st = stats(state),
     f = financeTotals(state, month),
     habits = state.habits.filter(h => !h.archived),
-    tasks = state.tasks.filter(t => t.date === st.day);
+    tasks = state.tasks.filter(t => t.date === st.day),
+    ideas = habitIdeas
+      .filter(i => !state.habits.some(h => lower(h.name) === lower(i.name)))
+      .slice(0, Math.max(0, 5 - habits.length));
   return (
     <>
       <section className="hero home-hero" aria-label="Sua sequência">
@@ -173,7 +202,7 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
             Ver todos <Icon name="chevron" />
           </button>
         </div>
-        {habits.slice(0, 2).map(h => {
+        {habits.slice(0, 5).map(h => {
           const done = h.doneDays.includes(st.day);
           return (
             <button
@@ -193,10 +222,30 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
             </button>
           );
         })}
-        {!habits.length && (
-          <button className="activity-row" onClick={() => open({ type: 'habit' })}>
-            <Icon name="plus" />
-            Criar meu primeiro hábito
+        {ideas.map(i => (
+          <button
+            key={i.name}
+            className="activity-row suggestion"
+            onClick={() => {
+              dispatch('habit.create', { name: i.name, xp: i.xp });
+              notify(`"${i.name}" entrou nos seus hábitos.`);
+            }}
+          >
+            <span className="checkbox add">
+              <Icon name="plus" />
+            </span>
+            <Art name={i.art} />
+            <span className="activity-name">
+              {i.name}
+              <small>Sugestão · toque para adicionar</small>
+            </span>
+            <span className="reward">+{i.xp} XP</span>
+          </button>
+        ))}
+        {habits.length > 5 && (
+          <button className="more-row" onClick={() => open({ type: 'habits' })}>
+            Mais {habits.length - 5} {habits.length - 5 === 1 ? 'hábito' : 'hábitos'}
+            <Icon name="chevron" />
           </button>
         )}
       </section>
@@ -220,8 +269,14 @@ export function HomeScreen({ open, month }: { open: OpenSheet; month: string }) 
 }
 export function GoalsScreen({ open }: { open: OpenSheet }) {
   const { state } = useForge(),
+    [all, setAll] = useState(false),
     st = stats(state),
-    goals = state.goals.filter(g => !g.archived);
+    goals = state.goals.filter(g => !g.archived),
+    shown = all ? goals : goals.slice(0, 5),
+    ideas = goalIdeas
+      .map((idea, index) => ({ ...idea, index }))
+      .filter(i => !state.goals.some(g => lower(g.name) === lower(i.name)))
+      .slice(0, Math.max(0, 5 - goals.length));
   return (
     <>
       <section className="hero goals-hero">
@@ -268,7 +323,7 @@ export function GoalsScreen({ open }: { open: OpenSheet }) {
         </button>
       </div>
       <section className="goal-list">
-        {goals.map(g => (
+        {shown.map(g => (
           <button
             className="panel goal-row"
             key={g.id}
@@ -299,9 +354,29 @@ export function GoalsScreen({ open }: { open: OpenSheet }) {
             <Icon name="chevron" />
           </button>
         ))}
-        {!goals.length && (
-          <button className="panel empty-state" onClick={() => open({ type: 'goal' })}>
-            Sua próxima conquista começa com uma meta. +
+        {ideas.map(i => (
+          <button
+            className="panel goal-row suggestion"
+            key={i.name}
+            onClick={() => open({ type: 'goal', id: String(i.index) })}
+          >
+            <span className="goal-art">
+              <Art name={i.art} />
+            </span>
+            <span className="goal-info">
+              <span className="goal-top">
+                <span className="goal-name">{i.name}</span>
+                <span className="reward">+300 XP</span>
+              </span>
+              <small>{i.category} · sugestão, toque para criar</small>
+            </span>
+            <Icon name="plus" />
+          </button>
+        ))}
+        {goals.length > 5 && (
+          <button className="more-row panel" onClick={() => setAll(v => !v)}>
+            {all ? 'Mostrar menos' : `Ver todas as ${goals.length} metas`}
+            <Icon name="chevron" />
           </button>
         )}
       </section>
@@ -419,7 +494,7 @@ export function FinanceScreen({
           >
             <Icon name={i} />
             <span>{c}</span>
-            <Dot value={money(f.byCategory[c] || 0)} />
+            <Dot value={compactMoney(f.byCategory[c] || 0)} />
           </button>
         ))}
       </section>

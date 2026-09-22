@@ -203,3 +203,19 @@ test('Invalid actions never mutate original state', () => {
 test('Calendar handles year boundaries', () => {
   assert.equal(shiftDay('2026-01-01', -1), '2025-12-31');
 });
+test('Agent memory saves durable notes, forgets by id and rejects empty text', () => {
+  let s = ready();
+  const save = cmd('memory.save', { text: '  Prefere treinar de manhã.  ' });
+  s = applyCommand(s, save, now);
+  assert.deepEqual(s.memory, [{ id: save.id, text: 'Prefere treinar de manhã.', at: save.at }]);
+  assert.throws(() => applyCommand(s, cmd('memory.save', { text: '   ' }), now));
+  s = applyCommand(s, cmd('memory.forget', { id: save.id }), now);
+  assert.deepEqual(s.memory, []);
+  assert.throws(() => applyCommand(s, cmd('memory.forget', { id: save.id }), now), /encontrado/);
+});
+test('Commands built elsewhere keep their ids so later commands can reference them', () => {
+  const create = cmd('habit.create', { name: 'Ler 10 páginas', xp: 20 });
+  let s = applyCommand(ready(), create, now);
+  s = applyCommand(s, cmd('habit.toggle', { id: create.id, done: true }), now);
+  assert.equal(s.habits.find(h => h.id === create.id)?.doneDays.length, 1);
+});

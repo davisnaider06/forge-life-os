@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { ForgeProvider } from '@/components/store';
 import './globals.css';
+import './glass.css';
 export const metadata: Metadata = {
   title: 'FORGE — Cada dia conta.',
   description: 'Metas, rotina e finanças. Seu progresso ganha forma.',

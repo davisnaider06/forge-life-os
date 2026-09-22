@@ -44,6 +44,17 @@ O escopo desejado é Banco do Brasil (conta e cartão), Mercado Pago e VR. A doc
 
 Contas e cartões aparecem separadamente. Compras do cartão não entram novamente no fluxo de caixa da conta; isso evita duplicá-las com o pagamento da fatura. Importações automáticas não geram XP por transação.
 
+## Agente do FORGE
+
+O botão ao lado da barra inferior abre o chat do agente (`src/components/agent-chat.tsx`). Ele roda sobre o Claude Agent SDK (`src/lib/agent.ts`) usando a assinatura do Claude do dono, nunca uma chave de API: `ANTHROPIC_API_KEY` é removida do ambiente do agente. As ferramentas leem uma cópia do estado enviada pelo aparelho e devolvem comandos do domínio; o app aplica esses comandos pelo mesmo fluxo validado dos botões e sincroniza normalmente. A memória do agente é o campo `memory` do estado (`memory.save` / `memory.forget`) e pode ser vista e apagada no próprio chat.
+
+Só os e-mails em `FORGE_AGENT_EMAILS` podem usar o chat, porque ele consome a sua assinatura.
+
+- Local: deixe `FORGE_AGENT_URL` vazio. A rota `/api/agent` roda o agente nesta máquina com o login do Claude Code.
+- Vercel: o binário do Claude Code (~230 MB) não cabe numa função. Hospede `agent-server/` (Dockerfile na pasta, build a partir da raiz) em um serviço com Docker, defina lá `FORGE_AGENT_SECRET` (32+ caracteres) e `CLAUDE_CODE_OAUTH_TOKEN` (gerado com `claude setup-token`), e na Vercel defina `FORGE_AGENT_URL` e o mesmo `FORGE_AGENT_SECRET`.
+
+A imagem da abertura (`public/assets/splash-mountain.webp`) é gerada por `scripts/generate-splash.py` (numpy + Pillow).
+
 ## PWA e notificações
 
 Manifesto e service worker são servidos na versão de produção. Push requer HTTPS, conta autenticada, permissão do usuário e chaves VAPID. Configure um agendador para chamar `/api/cron/reminders` com `Authorization: Bearer <CRON_SECRET>`. O arquivo `supabase/schedule-reminders.sql` contém uma opção de agendamento que precisa ser configurada no ambiente real.

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
+import { Icon } from './visuals';
 export function EnergyButton({ onClick, label }: { onClick: () => void; label: string }) {
   const host = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -83,7 +84,9 @@ export function EnergyButton({ onClick, label }: { onClick: () => void; label: s
   }, []);
   return (
     <button className="energy-button" onClick={onClick} aria-label={label}>
-      <span className="energy-fallback">✦</span>
+      <span className="energy-fallback">
+        <Icon name="chat" />
+      </span>
       <span id="energy-canvas" ref={host} aria-hidden="true" />
     </button>
   );

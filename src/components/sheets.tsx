@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useForge } from './store';
 import { Icon, Art, Progress, Badge } from './visuals';
-import { achievements, type Sheet, type OpenSheet } from './screens';
+import { achievements, goalIdeas, type Sheet, type OpenSheet } from './screens';
 import { stats, categories, parseMoney, money, type Command } from '@/lib/domain';
 import { browserSupabase } from '@/lib/supabase-browser';
 import { BankPanel } from './bank-panel';
@@ -321,7 +321,8 @@ function SheetContent({
         </form>
       </>
     );
-  if (sheet.type === 'goal')
+  if (sheet.type === 'goal') {
+    const idea = sheet.id ? goalIdeas[Number(sheet.id)] : undefined;
     return (
       <>
         <h2>Sua próxima conquista.</h2>
@@ -339,10 +340,16 @@ function SheetContent({
             required
             maxLength={80}
             placeholder="Ex.: Guardar R$ 1.000"
+            defaultValue={idea?.name}
           />
           <div className="form-row">
             <div>
-              <Select label="Categoria" name="category" values={[...categories]} />
+              <Select
+                label="Categoria"
+                name="category"
+                values={[...categories]}
+                value={idea?.category}
+              />
             </div>
             <div>
               <Field label="Prazo" name="deadline" type="date" required defaultValue={st.day} />
@@ -357,7 +364,7 @@ function SheetContent({
                 min="1"
                 max="100000000"
                 step="any"
-                defaultValue="100"
+                defaultValue={String(idea?.target ?? 100)}
                 required
               />
             </div>
@@ -366,6 +373,7 @@ function SheetContent({
                 label="Unidade"
                 name="unit"
                 values={['%', 'R$', 'horas', 'módulos', 'dias']}
+                value={idea?.unit}
               />
             </div>
           </div>
@@ -374,6 +382,7 @@ function SheetContent({
         </form>
       </>
     );
+  }
   if (sheet.type === 'progress') {
     const g = state.goals.find(g => g.id === sheet.id);
     if (!g) return <p>Meta não encontrada.</p>;
