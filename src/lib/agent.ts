@@ -4,7 +4,12 @@
 // validados; quem aplica e sincroniza é o próprio app, pelo mesmo fluxo dos botões.
 import { tmpdir } from 'node:os';
 import { z } from 'zod';
-import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
+import {
+  createSdkMcpServer,
+  query,
+  tool,
+  type SDKRateLimitInfo,
+} from '@anthropic-ai/claude-agent-sdk';
 import {
   applyCommand,
   categories,
@@ -17,7 +22,7 @@ import {
   type AppState,
   type Command,
 } from './domain';
-import type { AgentEvent, ChatTurn } from './agent-schema';
+import type { AgentEvent, AgentUsage, ChatTurn } from './agent-schema';
 
 const labels: Record<string, string> = {
   resumo: 'Lendo seu painel',
@@ -321,6 +326,28 @@ function transcript(turns: ChatTurn[], name: string) {
     : last.text;
 }
 
+// A assinatura informa o uso das janelas em fração (0–1) e o horário de renovação, não
+// um total de tokens. `unifiedWindows` chega junto do evento, mas ainda não está tipado.
+type Window = { utilization?: number; resetsAt?: number };
+function windows(info: SDKRateLimitInfo) {
+  const unified = (info as { unifiedWindows?: Record<string, Window> }).unifiedWindows || {},
+    pick = (w?: Window) =>
+      w && typeof w.utilization === 'number'
+        ? {
+            percent: Math.round(w.utilization * 100),
+            resetsAt: w.resetsAt ? new Date(w.resetsAt * 1000).toISOString() : undefined,
+          }
+        : undefined;
+  return {
+    fiveHour:
+      pick(unified.five_hour) ||
+      (info.rateLimitType === 'five_hour'
+        ? pick({ utilization: info.utilization, resetsAt: info.resetsAt })
+        : undefined),
+    week: pick(unified.seven_day),
+  };
+}
+
 const authMessages: Record<string, string> = {
   authentication_failed:
     'O servidor do agente não está logado na sua conta do Claude. Rode "claude setup-token" e configure CLAUDE_CODE_OAUTH_TOKEN.',
@@ -349,6 +376,7 @@ export async function* runAgent(
   if (process.env.FORGE_AGENT_CONFIG_DIR)
     env.CLAUDE_CONFIG_DIR = process.env.FORGE_AGENT_CONFIG_DIR;
   let textBlocks = 0;
+  const usage: AgentUsage = {};
   try {
     for await (const m of query({
       prompt: transcript(turns, state.profile.name),
@@ -384,7 +412,22 @@ export async function* runAgent(
           type: 'error',
           message: authMessages[m.error] || 'O Claude não conseguiu responder agora.',
         };
-      } else if (m.type === 'result' && m.subtype !== 'success') {
+      } else if (m.type === 'rate_limit_event') {
+        const w = windows(m.rate_limit_info);
+        if (w.fiveHour) usage.fiveHour = w.fiveHour;
+        if (w.week) usage.week = w.week;
+      } else if (m.type === 'result') {
+        usage.tokens = Object.values(m.modelUsage || {}).reduce(
+          (s, u) =>
+            s +
+            u.inputTokens +
+            u.outputTokens +
+            u.cacheReadInputTokens +
+            u.cacheCreationInputTokens,
+          0,
+        );
+      }
+      if (m.type === 'result' && m.subtype !== 'success') {
         yield {
           type: 'error',
           message:
@@ -405,6 +448,7 @@ export async function* runAgent(
       };
   }
   if (commands.length) yield { type: 'commands', commands };
+  if (usage.fiveHour || usage.tokens) yield { type: 'usage', usage };
   yield { type: 'done' };
 }
 

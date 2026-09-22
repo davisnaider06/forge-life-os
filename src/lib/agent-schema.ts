@@ -2,8 +2,11 @@ import { z } from 'zod';
 import type { Command } from './domain';
 
 export type ChatTurn = { role: 'user' | 'assistant'; text: string };
+export type UsageWindow = { percent: number; resetsAt?: string };
+export type AgentUsage = { fiveHour?: UsageWindow; week?: UsageWindow; tokens?: number };
 export type AgentEvent =
   | { type: 'text'; text: string }
+  | { type: 'usage'; usage: AgentUsage }
   | { type: 'tool'; label: string }
   | { type: 'commands'; commands: Command[] }
   | { type: 'error'; message: string }

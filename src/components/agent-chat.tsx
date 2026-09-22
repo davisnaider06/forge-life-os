@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForge } from './store';
 import { Icon } from './visuals';
-import type { AgentEvent, ChatTurn } from '@/lib/agent-schema';
+import type { AgentEvent, AgentUsage, ChatTurn } from '@/lib/agent-schema';
 
 type Message = ChatTurn & { changes?: number; error?: boolean };
 const suggestions = [
@@ -61,7 +61,9 @@ export function AgentChat({ open, close }: { open: boolean; close: () => void })
     [status, setStatus] = useState(''),
     [busy, setBusy] = useState(false),
     [showMemory, setShowMemory] = useState(false),
+    [usage, setUsage] = useState<(AgentUsage & { at: string }) | null>(null),
     chatKey = storageKey + '.chat',
+    usageKey = storageKey + '.usage',
     memory = state.memory || [],
     unavailable = demo
       ? 'O agente não funciona no modo demonstração.'
@@ -77,6 +79,13 @@ export function AgentChat({ open, close }: { open: boolean; close: () => void })
       setMessages([]);
     }
   }, [chatKey]);
+  useEffect(() => {
+    try {
+      setUsage(JSON.parse(localStorage.getItem(usageKey) || 'null'));
+    } catch {
+      setUsage(null);
+    }
+  }, [usageKey]);
   useEffect(() => {
     if (busy) return;
     try {
@@ -148,7 +157,15 @@ export function AgentChat({ open, close }: { open: boolean; close: () => void })
             setStatus('');
             patch(m => ({ ...m, text: m.text + e.text }));
           } else if (e.type === 'tool') setStatus(e.label);
-          else if (e.type === 'commands') {
+          else if (e.type === 'usage') {
+            const next = { ...e.usage, at: new Date().toISOString() };
+            setUsage(next);
+            try {
+              localStorage.setItem(usageKey, JSON.stringify(next));
+            } catch {
+              /* O medidor volta a aparecer na próxima resposta. */
+            }
+          } else if (e.type === 'commands') {
             const n = applyCommands(e.commands);
             if (n) {
               patch(m => ({ ...m, changes: (m.changes || 0) + n }));
@@ -337,6 +354,47 @@ export function AgentChat({ open, close }: { open: boolean; close: () => void })
           </button>
         )}
       </form>
+      <UsageMeter usage={usage} />
     </dialog>
+  );
+}
+
+const time = (iso: string) =>
+  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const tokens = (n: number) =>
+  n < 1000
+    ? `${n} tokens`
+    : `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil tokens`;
+// O plano do Claude informa o uso da janela em percentual, não em tokens; o número de
+// tokens exibido é o gasto da última resposta.
+function UsageMeter({ usage }: { usage: (AgentUsage & { at: string }) | null }) {
+  const five = usage?.fiveHour,
+    renewed = five?.resetsAt && Date.parse(five.resetsAt) < Date.now();
+  if (!five)
+    return (
+      <p className="agent-usage empty">
+        O consumo da janela de 5h aparece após a primeira resposta.
+      </p>
+    );
+  const percent = renewed ? 0 : five.percent;
+  return (
+    <div
+      className={'agent-usage ' + (percent >= 90 ? 'high' : percent >= 70 ? 'warn' : '')}
+      aria-label={`Janela de 5 horas: ${percent}% usado`}
+    >
+      <div className="agent-usage-line">
+        <span>Janela de 5h</span>
+        <strong>{renewed ? 'renovada' : percent + '%'}</strong>
+        <span className="agent-usage-bar">
+          <i style={{ width: percent + '%' }} />
+        </span>
+        {five.resetsAt && !renewed && <span>renova {time(five.resetsAt)}</span>}
+      </div>
+      <small>
+        {usage.week ? `Semana ${usage.week.percent}% · ` : ''}
+        {usage.tokens ? `última resposta ${tokens(usage.tokens)} · ` : ''}
+        atualizado {time(usage.at)}
+      </small>
+    </div>
   );
 }

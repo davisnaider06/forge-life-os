@@ -534,7 +534,7 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 10px 12px 8px;
   border-top: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.16);
 }
@@ -603,4 +603,49 @@
   .category-pill.pressed {
     transform: none;
   }
+}
+.agent-usage {
+  padding: 0 16px calc(10px + env(safe-area-inset-bottom));
+  margin-top: -2px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-usage.empty {
+  text-align: center;
+}
+.agent-usage-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.agent-usage-line strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.agent-usage-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.agent-usage-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #15b9cd, #8ff4f7);
+  box-shadow: 0 0 8px rgba(52, 220, 233, 0.45);
+}
+.agent-usage.warn .agent-usage-bar i {
+  background: linear-gradient(90deg, #d9a441, #f5d27a);
+}
+.agent-usage.high .agent-usage-bar i {
+  background: linear-gradient(90deg, #d8604a, #f3a08f);
+}
+.agent-usage small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
 }
