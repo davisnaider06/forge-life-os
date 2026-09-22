@@ -47,6 +47,7 @@ export type BankAccount = {
   balanceCents: number;
   updatedAt: string;
 };
+export type MemoryNote = { id: string; text: string; at: string };
 export type AppState = {
   schema: 1;
   profile: { name: string; handle: string; city: string; timezone: string; onboarded: boolean };
@@ -59,6 +60,7 @@ export type AppState = {
   accounts: BankAccount[];
   awards: Record<string, Award>;
   receipts: string[];
+  memory?: MemoryNote[];
   demoBaseXp?: number;
 };
 export const commandTypes = [
@@ -77,6 +79,8 @@ export const commandTypes = [
   'goal.archive',
   'transaction.create',
   'transaction.delete',
+  'memory.save',
+  'memory.forget',
   'checkin',
 ] as const;
 export const commandSchema = z
@@ -391,6 +395,17 @@ export function applyCommand(current: AppState, raw: unknown, now = new Date()):
       if (t.source !== 'manual') throw Error('Transações importadas são gerenciadas pelo banco.');
       s.transactions = s.transactions.filter(t => t.id !== p.id);
       if (s.awards[`transaction:${p.id}`]) s.awards[`transaction:${p.id}`].active = false;
+      break;
+    }
+    case 'memory.save': {
+      const p = z.object({ text: z.string().trim().min(1).max(500) }).parse(cmd.payload);
+      s.memory = [...(s.memory || []), { id: cmd.id, text: p.text, at: cmd.at }].slice(-200);
+      break;
+    }
+    case 'memory.forget': {
+      const p = z.object({ id }).parse(cmd.payload);
+      assertFound(s.memory?.find(m => m.id === p.id));
+      s.memory = s.memory!.filter(m => m.id !== p.id);
       break;
     }
     case 'checkin':

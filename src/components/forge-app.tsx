@@ -15,6 +15,8 @@ import { Onboarding } from './onboarding';
 import { AuthGate } from './auth-gate';
 import { Sheets } from './sheets';
 import { EnergyButton } from './energy-button';
+import { AgentChat } from './agent-chat';
+import { Splash } from './splash';
 import { stats } from '@/lib/domain';
 const routes: { screen: Screen; label: string; icon: string; href: string }[] = [
   { screen: 'inicio', label: 'Início', icon: 'home', href: '/' },
@@ -27,6 +29,7 @@ export function ForgeApp({ screen }: { screen: Screen }) {
     [sheet, setSheet] = useState<Sheet | null>(null),
     [month, setMonth] = useState(() => new Date().toLocaleDateString('en-CA').slice(0, 7)),
     [filter, setFilter] = useState<string | null>(null),
+    [chat, setChat] = useState(false),
     main = useRef<HTMLElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     needsAuth = ready && !demo && capabilities.cloud && !capabilities.user;
@@ -83,6 +86,48 @@ export function ForgeApp({ screen }: { screen: Screen }) {
     return () => {
       removeEventListener('resize', fit);
       removeEventListener('orientationchange', fit);
+    };
+  }, []);
+  useEffect(() => {
+    // Cartões inclinam na direção do toque e o brilho segue o dedo, como vidro no iOS.
+    const root = scroll.current;
+    if (!root || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let card: HTMLElement | null = null;
+    const tilt = (e: PointerEvent) => {
+      if (!card) return;
+      const r = card.getBoundingClientRect(),
+        x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+        y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+        depth = Math.max(2, 7 - r.width / 90);
+      card.style.setProperty('--ry', ((x - 0.5) * depth).toFixed(2) + 'deg');
+      card.style.setProperty('--rx', ((0.5 - y) * depth).toFixed(2) + 'deg');
+      card.style.setProperty('--mx', (x * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+    };
+    const release = () => {
+      card?.classList.remove('pressed');
+      card?.style.setProperty('--rx', '0deg');
+      card?.style.setProperty('--ry', '0deg');
+      card = null;
+    };
+    const press = (e: PointerEvent) => {
+      release();
+      card = (e.target as Element).closest<HTMLElement>('.panel, .category-pill');
+      if (!card || card.classList.contains('hero')) return (card = null);
+      card.classList.add('pressed');
+      tilt(e);
+    };
+    root.addEventListener('pointerdown', press);
+    root.addEventListener('pointermove', tilt);
+    addEventListener('pointerup', release);
+    addEventListener('pointercancel', release);
+    root.addEventListener('scroll', release, { passive: true });
+    return () => {
+      root.removeEventListener('pointerdown', press);
+      root.removeEventListener('pointermove', tilt);
+      removeEventListener('pointerup', release);
+      removeEventListener('pointercancel', release);
+      root.removeEventListener('scroll', release);
     };
   }, []);
   const onboarded = ready && !needsAuth && state.profile.onboarded;
@@ -179,19 +224,14 @@ export function ForgeApp({ screen }: { screen: Screen }) {
               </Link>
             ))}
           </nav>
-          <EnergyButton
-            label="Registrar uma ação"
-            onClick={() =>
-              setSheet({
-                type: screen === 'metas' ? 'goal' : screen === 'financas' ? 'transaction' : 'quick',
-              })
-            }
-          />
+          <EnergyButton label="Conversar com o agente do FORGE" onClick={() => setChat(true)} />
         </div>
       )}
       <div className={'toast ' + (message ? 'visible' : '')} role="status" aria-live="polite">
         {message}
       </div>
+      <AgentChat open={chat} close={() => setChat(false)} />
+      <Splash ready={ready} />
       <Sheets
         sheet={sheet}
         open={setSheet}

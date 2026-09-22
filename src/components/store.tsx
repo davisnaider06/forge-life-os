@@ -32,6 +32,8 @@ type Context = {
   message: string;
   notify: (m: string) => void;
   dispatch: (type: Command['type'], payload: unknown) => void;
+  applyCommands: (commands: Command[]) => number;
+  storageKey: string;
   retry: () => void;
   exportData: () => void;
 };
@@ -235,6 +237,33 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     },
     [persist, flush, notify],
   );
+  // Comandos já montados pelo agente: mantêm id e horário para que um hábito criado e
+  // marcado na mesma resposta continue apontando para o mesmo registro.
+  const applyCommands = useCallback(
+    (commands: Command[]) => {
+      const latest = read(key.current) || ref.current,
+        applied: Command[] = [];
+      let state = latest.state;
+      for (const cmd of commands)
+        try {
+          state = applyCommand(state, cmd, new Date(cmd.at));
+          applied.push(cmd);
+        } catch {
+          /* O estado mudou desde que o agente leu; ignora só este comando. */
+        }
+      if (applied.length) {
+        persist({
+          ...latest,
+          state,
+          history: [...latest.history, ...applied],
+          pending: caps.current.user ? [...latest.pending, ...applied] : latest.pending,
+        });
+        void flush();
+      }
+      return applied.length;
+    },
+    [persist, flush],
+  );
   useEffect(() => {
     if (ready) {
       document.body.classList.toggle('theme-light', envelope.state.theme === 'light');
@@ -263,6 +292,8 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         message,
         notify,
         dispatch,
+        applyCommands,
+        storageKey: key.current,
         retry: () => {
           void flush();
         },
